@@ -19,7 +19,7 @@ fi
 if [[ -z "$DOWNSTREAM_BRANCH" ]]; then
   echo "Missing \$DOWNSTREAM_BRANCH"
   echo "Default to ${UPSTREAM_BRANCH}"
-  DOWNSTREAM_BREANCH=UPSTREAM_BRANCH
+  DOWNSTREAM_BRANCH=$UPSTREAM_BRANCH
 fi
 
 if ! echo "$UPSTREAM_REPO" | grep '\.git'; then
