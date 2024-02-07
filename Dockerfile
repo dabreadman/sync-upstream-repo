@@ -1,12 +1,10 @@
-FROM alpine:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.3-1552
 
-RUN apk add --no-cache \
-	bash \
-	git
+RUN microdnf -y install bash git && microdnf clean all
 
-RUN adduser -D ci
+RUN useradd -d /home/ci ci
 
-ADD *.sh /home/ci/
+ADD entrypoint.sh /home/ci/
 
 RUN chmod 555 /home/ci/*.sh 
 

@@ -1,70 +1,88 @@
 #!/usr/bin/env bash
 
-set -x
+set -e
 
-UPSTREAM_REPO=$1
+readonly GIT_REPO_REGEX="^(https|git)(:\/\/|@)([^\/:]+)[\/:]([^\/:]+)\/(.+)(.git)*$"
+UPSTREAM_REPO_URL=$1
 UPSTREAM_BRANCH=$2
-DOWNSTREAM_BRANCH=$3
-GITHUB_TOKEN=$4
-FETCH_ARGS=$5
-MERGE_ARGS=$6
-PUSH_ARGS=$7
-SPAWN_LOGS=$8
+DOWNSTREAM_REPO_URL=$3
+DOWNSTREAM_BRANCH=$4
+GITHUB_TOKEN=$5
+FETCH_ARGS=$6
+REBASE_ARGS=$7
+PUSH_ARGS=$8
 
-if [[ -z "$UPSTREAM_REPO" ]]; then
-  echo "Missing \$UPSTREAM_REPO"
+if [[ -z "${UPSTREAM_REPO_URL}" ]]; then
+  echo "Missing UPSTREAM_REPO"
   exit 1
 fi
 
-if [[ -z "$DOWNSTREAM_BRANCH" ]]; then
-  echo "Missing \$DOWNSTREAM_BRANCH"
-  echo "Default to ${UPSTREAM_BRANCH}"
-  DOWNSTREAM_BREANCH=UPSTREAM_BRANCH
+if [[ -z "${UPSTREAM_BRANCH}" ]]; then
+  echo "Missing UPSTREAM_BRANCH"
+  exit 1
 fi
 
-if ! echo "$UPSTREAM_REPO" | grep '\.git'; then
-  UPSTREAM_REPO="https://github.com/${UPSTREAM_REPO_PATH}.git"
+if [[ -z "${DOWNSTREAM_REPO_URL}" ]]; then
+  echo "Missing DOWNSTREAM_REPO_URL"
+  exit 1
 fi
 
-echo "UPSTREAM_REPO=$UPSTREAM_REPO"
+if [[ -z "${GITHUB_TOKEN}" ]]; then
+  echo "Missing GITHUB_TOKEN"
+  exit 1
+fi
 
-git clone "https://github.com/${GITHUB_REPOSITORY}.git" work
+echo "Running with these values:"
+echo "    UPSTREAM_REPO_URL='${UPSTREAM_REPO_URL}'"
+echo "    UPSTREAM_BRANCH='${UPSTREAM_BRANCH}'"
+echo "    DOWNSTREAM_REPO_URL='${DOWNSTREAM_REPO_URL}'"
+echo "    DOWNSTREAM_BRANCH='${DOWNSTREAM_BRANCH}'"
+echo "    GITHUB_TOKEN=*******"
+echo "    FETCH_ARGS='${FETCH_ARGS}'"
+echo "    REBASE_ARGS='${REBASE_ARGS}'"
+echo "    PUSH_ARGS='${PUSH_ARGS}'"
+
+
+if [[ -z "${DOWNSTREAM_BRANCH}" ]]; then
+  echo "Missing DOWNSTREAM_BRANCH, defaulting it to ${UPSTREAM_BRANCH}"
+  DOWNSTREAM_BRANCH=${UPSTREAM_BRANCH}
+fi
+
+
+if [[ ${DOWNSTREAM_REPO_URL} =~ ${GIT_REPO_REGEX} ]]; then    
+   DOWNSTREAM_REPO="${BASH_REMATCH[4]}/${BASH_REMATCH[5]}"
+else 
+  echo "${DOWNSTREAM_REPO_URL} does not seem to be a valid GitHub repo url"
+  exit 1
+fi
+
+mkdir -pv work
+if [[ $? -gt 0 ]]; then
+  echo "Failed to create work directory"
+  exit 1
+fi 
+
+git clone --branch ${DOWNSTREAM_BRANCH} "https://github.com/${DOWNSTREAM_REPO}" work
 cd work || { echo "Missing work dir" && exit 2 ; }
 
 git config user.name "${GITHUB_ACTOR}"
 git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 git config --local user.password ${GITHUB_TOKEN}
 
-git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-
-git remote add upstream "$UPSTREAM_REPO"
-git fetch ${FETCH_ARGS} upstream
+git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${DOWNSTREAM_REPO}"
+git remote add upstream "$UPSTREAM_REPO_URL"
+git fetch --tags ${FETCH_ARGS} upstream
 git remote -v
 
-git checkout ${DOWNSTREAM_BRANCH}
+echo "Rebasing upstream/${UPSTREAM_BRANCH} unto ${DOWNSTREAM_BRANCH}"
+git rebase ${MERGE_ARGS} upstream/${UPSTREAM_BRANCH}
 
-case ${SPAWN_LOGS} in
-  (true)    echo -n "sync-upstream-repo https://github.com/dabreadman/sync-upstream-repo keeping CI alive."\
-            "UNIX Time: " >> sync-upstream-repo
-            date +"%s" >> sync-upstream-repo
-            git add sync-upstream-repo
-            git commit sync-upstream-repo -m "Syncing upstream";;
-  (false)   echo "Not spawning time logs"
-esac
+echo "Pushing changes to origin ${DOWNSTREAM_BRANCH}"
+git push ${PUSH_ARGS} origin ${DOWNSTREAM_BRANCH}
 
-git push origin
+echo "Pushing tags to origin..."
+git push -f --tags origin
 
-MERGE_RESULT=$(git merge ${MERGE_ARGS} upstream/${UPSTREAM_BRANCH})
-
-
-if [[ $MERGE_RESULT == "" ]] 
-then
-  exit 1
-elif [[ $MERGE_RESULT != *"Already up to date."* ]]
-then
-  git commit -m "Merged upstream"
-  git push ${PUSH_ARGS} origin ${DOWNSTREAM_BRANCH} || exit $?
-fi
 
 cd ..
 rm -rf work

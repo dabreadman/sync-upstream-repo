@@ -3,15 +3,18 @@ description: Syncs and merges your current repository with the upstream reposito
 author: Dabreadman
 
 inputs:
-  upstream_repo:
-    description: URL of gitHub public upstream repo
+  upstream_repo_url:
+    description: URL of GitHub public upstream repo
     required: true
   upstream_branch:
     description: Branch to merge from upstream (defaults to downstream branch)
     required: false
     default: "main"
+  downstream_repo_url:
+    description: URL of the GitHub repo from upstream
+    required: true
   downstream_branch:
-    description: Branch to merge into downstream
+    description: Branch to merge into downstream, if not provided it will default to the upstream branch name
     required: false
     default: ""
   token:
@@ -21,18 +24,14 @@ inputs:
     description: Git fetch arguments
     required: false
     default: ""
-  merge_args:
-    description: Git merge arguments
+  rebase_args:
+    description: Git rebase arguments
     required: false
     default: ""
   push_args:
     description: Git push arguments
     required: false
     default: ""
-  spawn_logs: 
-    description: Toggle to spawn `sync-upstream-repo` with time logs
-    required: true
-    default: false
 
 runs:
   using: "docker"
@@ -40,12 +39,12 @@ runs:
   args:
     - ${{ inputs.upstream_repo }}
     - ${{ inputs.upstream_branch }}
+    - ${{ inputs.downstream_repo }}
     - ${{ inputs.downstream_branch }}
     - ${{ inputs.token }}
     - ${{ inputs.fetch_args }}
-    - ${{ inputs.merge_args }}
+    - ${{ inputs.rebase_args }}
     - ${{ inputs.push_args }}
-    - ${{ inputs.spawn_logs }}
 
 branding:
   icon: "git-merge"
