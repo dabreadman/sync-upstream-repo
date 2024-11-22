@@ -56,6 +56,11 @@ git push origin
 
 MERGE_RESULT=$(git merge ${MERGE_ARGS} upstream/${UPSTREAM_BRANCH})
 
+retval=$?
+if [[ "$retval" != "0" ]] ; then
+  echo "Git merge failed with return value: $retval"
+  exit $retval
+fi
 
 if [[ $MERGE_RESULT == "" ]] 
 then
